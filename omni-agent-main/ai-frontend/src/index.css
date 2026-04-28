@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,opsz,wght@0,18..144,300..900;1,18..144,300..900&family=Outfit:wght@100..900&display=swap');
+@import "tailwindcss";
+
+.font-merriweather {
+  font-family: 'Merriweather', serif;
+}
+
+.font-outfit {
+  font-family: 'Outfit', sans-serif;
+}
+
+/* The container or body */
+.custom-scroll {
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
+}
+
+/* Width and Height of the scrollbar */
+.custom-scroll::-webkit-scrollbar {
+  width: 6px;  /* Thin for vertical scrolls */
+  height: 6px; /* Thin for horizontal scrolls */
+}
+
+/* The track (background) */
+.custom-scroll::-webkit-scrollbar-track {
+  background: var(--scrollbar-bg);
+}
+
+/* The draggable handle */
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 10px;
+  backdrop-filter: blur(4px); /* Adds to the translucent feel */
+}
+
+/* Handle on hover */
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}

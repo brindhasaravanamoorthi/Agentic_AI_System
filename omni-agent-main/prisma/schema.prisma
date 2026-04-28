@@ -1,0 +1,442 @@
+// Prisma Schema for OmniAgent Clothing Store
+// Database: SQLite (file-based, perfect for demo/simulation)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// PRODUCT DOMAIN
+// ============================================
+
+model Category {
+  id           String    @id @default(uuid())
+  name         String
+  slug         String    @unique
+  parentId     String?   @map("parent_id")
+  parent       Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children     Category[] @relation("CategoryHierarchy")
+  displayOrder Int       @default(0) @map("display_order")
+  products     Product[]
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@map("categories")
+}
+
+model Product {
+  id          String           @id @default(uuid())
+  name        String
+  description String?
+  brand       String?
+  categoryId  String           @map("category_id")
+  category    Category         @relation(fields: [categoryId], references: [id])
+  variants    ProductVariant[]
+  metadata    String?          // JSON as string for SQLite
+  isSimulated Boolean          @default(false) @map("is_simulated")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  @@index([categoryId])
+  @@map("products")
+}
+
+model ProductVariant {
+  id         String      @id @default(uuid())
+  productId  String      @map("product_id")
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku        String      @unique
+  size       String?
+  color      String?
+  price      Float       // SQLite uses REAL for decimals
+  costPrice  Float       @map("cost_price")
+  images     String?     // JSON array as string
+  weight     Float?
+  inventory  Inventory?
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  @@index([productId])
+  @@index([sku])
+  @@map("product_variants")
+}
+
+model Inventory {
+  id                String         @id @default(uuid())
+  variantId         String         @unique @map("variant_id")
+  variant           ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  quantity          Int            @default(0)
+  reservedQuantity  Int            @default(0) @map("reserved_quantity")
+  warehouseLocation String?        @map("warehouse_location")
+  reorderThreshold  Int            @default(10) @map("reorder_threshold")
+  reorderQuantity   Int            @default(50) @map("reorder_quantity")
+  lastRestockedAt   DateTime?      @map("last_restocked_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  @@index([quantity])
+  @@map("inventory")
+}
+
+// ============================================
+// CUSTOMER & ORDER DOMAIN
+// ============================================
+
+model Customer {
+  id             String          @id @default(uuid())
+  email          String          @unique
+  name           String
+  phone          String?
+  addresses      Address[]
+  orders         Order[]
+  carts          Cart[]
+  returnRequests ReturnRequest[]
+  isSimulated    Boolean         @default(false) @map("is_simulated")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  @@index([email])
+  @@map("customers")
+}
+
+model Address {
+  id         String   @id @default(uuid())
+  customerId String   @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  type       String   // "billing" or "shipping"
+  street     String
+  city       String
+  state      String
+  zip        String
+  country    String   @default("US")
+  isDefault  Boolean  @default(false) @map("is_default")
+  orders     Order[]
+
+  @@index([customerId])
+  @@map("addresses")
+}
+
+model Cart {
+  id          String     @id @default(uuid())
+  customerId  String?    @map("customer_id")
+  customer    Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  sessionId   String?    @unique @map("session_id")
+  items       CartItem[]
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  abandonedAt DateTime?  @map("abandoned_at")
+
+  @@index([customerId])
+  @@index([sessionId])
+  @@index([abandonedAt])
+  @@map("carts")
+}
+
+model CartItem {
+  id        String         @id @default(uuid())
+  cartId    String         @map("cart_id")
+  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variantId String         @map("variant_id")
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+  quantity  Int            @default(1)
+  addedAt   DateTime       @default(now()) @map("added_at")
+
+  @@unique([cartId, variantId])
+  @@index([cartId])
+  @@map("cart_items")
+}
+
+model Order {
+  id                String          @id @default(uuid())
+  orderNumber       String          @unique @map("order_number")
+  customerId        String          @map("customer_id")
+  customer          Customer        @relation(fields: [customerId], references: [id])
+  status            String          @default("pending")
+  subtotal          Float
+  tax               Float           @default(0)
+  shipping          Float           @default(0)
+  total             Float
+  shippingAddressId String          @map("shipping_address_id")
+  shippingAddress   Address         @relation(fields: [shippingAddressId], references: [id])
+  items             OrderItem[]
+  payment           Payment?
+  returnRequests    ReturnRequest[]
+  isSimulated       Boolean         @default(false) @map("is_simulated")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id               String         @id @default(uuid())
+  orderId          String         @map("order_id")
+  order            Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId        String         @map("variant_id")
+  variant          ProductVariant @relation(fields: [variantId], references: [id])
+  quantity         Int
+  priceAtPurchase  Float          @map("price_at_purchase")
+  costAtPurchase   Float          @map("cost_at_purchase")
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  orderId       String   @unique @map("order_id")
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount        Float
+  method        String
+  status        String   @default("pending")
+  transactionId String?  @map("transaction_id")
+  metadata      String?  // JSON as string
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([status])
+  @@map("payments")
+}
+
+model ReturnRequest {
+  id          String   @id @default(uuid())
+  orderId     String   @map("order_id")
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customerId  String   @map("customer_id")
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  email       String   // Contact email for support agent to send updates
+  type        String   // "return" | "refund"
+  reason      String
+  reasonDetail String? @map("reason_detail")
+  status      String   @default("pending") // pending, approved, rejected, completed
+  refundAmount Float?  @map("refund_amount")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([orderId])
+  @@index([customerId])
+  @@index([status])
+  @@map("return_requests")
+}
+
+model SupportTicket {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  subject   String?
+  message   String
+  status    String   @default("open") // open, in_progress, resolved
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("support_tickets")
+}
+
+model SupportConversation {
+  id            String   @id @default(uuid())
+  referenceType String   @map("reference_type") // "return" | "support"
+  referenceId   String   @map("reference_id")   // return_requests.id or support_tickets.id
+  role          String   // "customer" | "assistant"
+  content       String
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([referenceType, referenceId])
+  @@map("support_conversations")
+}
+
+// ============================================
+// AGENT SYSTEM DOMAIN
+// ============================================
+
+model AgentType {
+  id            String          @id
+  name          String
+  role          String
+  configuration String?         // JSON as string
+  isActive      Boolean         @default(true) @map("is_active")
+  logs          AgentLog[]
+  decisions     AgentDecision[]
+  votes         AgentVote[]
+  alerts        AgentAlert[]
+
+  @@map("agent_types")
+}
+
+model AgentLog {
+  id        String    @id @default(uuid())
+  agentId   String    @map("agent_id")
+  agent     AgentType @relation(fields: [agentId], references: [id])
+  eventType String    @map("event_type")
+  severity  String    @default("info")
+  message   String
+  metadata  String?   // JSON as string
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([agentId, createdAt])
+  @@index([eventType])
+  @@index([severity])
+  @@map("agent_logs")
+}
+
+model AgentDecision {
+  id           String      @id @default(uuid())
+  decisionType String      @map("decision_type")
+  proposedBy   String      @map("proposed_by")
+  proposer     AgentType   @relation(fields: [proposedBy], references: [id])
+  status       String      @default("pending")
+  decisionData String      @map("decision_data") // JSON as string
+  reasoning    String?
+  votes        AgentVote[]
+  createdAt    DateTime    @default(now()) @map("created_at")
+  resolvedAt   DateTime?   @map("resolved_at")
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("agent_decisions")
+}
+
+model AgentVote {
+  id         String        @id @default(uuid())
+  decisionId String        @map("decision_id")
+  decision   AgentDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  agentId    String        @map("agent_id")
+  agent      AgentType     @relation(fields: [agentId], references: [id])
+  approve    Boolean
+  reasoning  String?
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  @@unique([decisionId, agentId])
+  @@map("agent_votes")
+}
+
+model MonitoringRule {
+  id              String       @id @default(uuid())
+  ruleType        String       @map("rule_type")
+  agentResponsible String      @map("agent_responsible")
+  thresholdConfig String       @map("threshold_config") // JSON as string
+  enabled         Boolean      @default(true)
+  alerts          AgentAlert[]
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  @@index([ruleType])
+  @@map("monitoring_rules")
+}
+
+model AgentAlert {
+  id            String         @id @default(uuid())
+  ruleId        String         @map("rule_id")
+  rule          MonitoringRule @relation(fields: [ruleId], references: [id])
+  agentId       String         @map("agent_id")
+  agent         AgentType      @relation(fields: [agentId], references: [id])
+  severity      String
+  message       String
+  alertData     String         @map("alert_data") // JSON as string
+  acknowledged  Boolean        @default(false)
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  @@index([agentId, createdAt])
+  @@index([severity])
+  @@map("agent_alerts")
+}
+
+// ============================================
+// AGENT MEMORY (per-agent context)
+// ============================================
+
+model AgentMemory {
+  id        String   @id @default(uuid())
+  agentId   String   @map("agent_id")   // warden, finance, architect, consensus, proposal
+  sessionId String   @default("global") @map("session_id") // "global" or chat session id
+  content   String   // JSON or text summary of agent's memory
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([agentId, sessionId])
+  @@index([agentId])
+  @@index([sessionId])
+  @@map("agent_memories")
+}
+
+// ============================================
+// CHAT DOMAIN
+// ============================================
+
+model ChatSession {
+  id        String        @id @default(uuid())
+  userId    String        @default("default") @map("user_id")
+  title     String        @default("New Chat") // Auto-generated from first message
+  messages  ChatMessage[]
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([updatedAt])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id           String   @id @default(uuid())
+  sessionId    String   @map("session_id")
+  session      ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role         String   // "user" | "assistant" | "system"
+  content      String
+  decisionMeta String?  @map("decision_meta") // JSON: { status, votes, proposedAction?, decisionId? }
+  analysisMeta String?  @map("analysis_meta") // JSON: { warden?, finance? }
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([sessionId])
+  @@map("chat_messages")
+}
+
+model PendingDecision {
+  id          String    @id @default(uuid())
+  sessionId   String    @map("session_id")
+  messageId   String?   @map("message_id")
+  actionType  String    @map("action_type") // add_product, alter_product, send_reply_email, architect_research
+  payload     String    // JSON
+  input       String    // Original user query
+  status      String    @default("pending") // pending, approved, rejected
+  resolvedAt  DateTime? @map("resolved_at")
+  result      String?   // JSON - result of execution
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([status])
+  @@map("pending_decisions")
+}
+
+// ============================================
+// SIMULATION DOMAIN
+// ============================================
+
+model SimulationScenario {
+  id           String            @id @default(uuid())
+  name         String
+  description  String?
+  initialState String            @map("initial_state") // JSON as string
+  triggers     String            // JSON as string
+  events       SimulationEvent[]
+  isActive     Boolean           @default(false) @map("is_active")
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  @@map("simulation_scenarios")
+}
+
+model SimulationEvent {
+  id             String              @id @default(uuid())
+  scenarioId     String              @map("scenario_id")
+  scenario       SimulationScenario  @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  eventType      String              @map("event_type")
+  eventData      String              @map("event_data") // JSON as string
+  executionOrder Int                 @map("execution_order")
+  delaySeconds   Int                 @default(0) @map("delay_seconds")
+  executed       Boolean             @default(false)
+  executedAt     DateTime?           @map("executed_at")
+
+  @@index([scenarioId, executionOrder])
+  @@map("simulation_events")
+}

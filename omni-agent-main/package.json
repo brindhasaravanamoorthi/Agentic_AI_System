@@ -1,0 +1,66 @@
+{
+  "name": "omniagent",
+  "version": "1.0.0",
+  "description": "Multi-agent orchestration system for clothing e-commerce management",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "db:setup": "prisma migrate dev && prisma generate && npm run prisma:seed",
+    "dev:ai-frontend": "npm run dev --prefix ai-frontend",
+    "dev:ecom-frontend": "npm run dev --prefix ecom-frontend",
+    "dev:all": "concurrently -n api,ai,ecom -c blue,green,magenta \"npm run dev\" \"npm run dev:ai-frontend\" \"npm run dev:ecom-frontend\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "ecommerce",
+    "langgraph",
+    "ollama"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.2.3",
+    "@types/nodemailer": "^7.0.9",
+    "@types/ws": "^8.18.1",
+    "concurrently": "^9.1.0",
+    "nodemon": "^3.1.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "wait-on": "^8.0.1"
+  },
+  "dependencies": {
+    "@langchain/core": "^1.1.24",
+    "@langchain/langgraph": "^1.1.4",
+    "@langchain/ollama": "^1.2.2",
+    "@langchain/openai": "^1.2.7",
+    "@prisma/client": "5.22.0",
+    "@tailwindcss/vite": "^4.1.18",
+    "@tavily/core": "^0.7.1",
+    "bull": "^4.16.5",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1",
+    "ioredis": "^5.9.2",
+    "lucide-react": "^0.564.0",
+    "nodemailer": "^8.0.1",
+    "prisma": "5.22.0",
+    "socket.io": "^4.8.3",
+    "tailwindcss": "^4.1.18",
+    "undici": "^7.22.0",
+    "zod": "^4.3.6"
+  }
+}
